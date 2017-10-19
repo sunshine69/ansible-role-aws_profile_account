@@ -1,0 +1,31 @@
+- name: gather ec2 metadata
+  ec2_metadata_facts:
+  register: instance_metadata
+  no_log: yes
+
+- name: obtain instance profile name
+  set_fact:
+    instance_profile_arn: "{{ (instance_metadata.ansible_facts.ansible_ec2_iam_info | from_json).InstanceProfileArn | regex_replace('.*/', '') }}"
+
+- name: obtain instance security_credentials
+  set_fact:
+    instance_security_credentials: "{{ instance_metadata.ansible_facts['ansible_ec2_iam_security_credentials_' + instance_profile_arn] }}"
+  no_log: yes
+
+- name: obtain instance profile security info
+  set_fact:
+    aws_access_key: "{{ instance_security_credentials['AccessKeyId'] }}"
+    aws_secret_key: "{{ instance_security_credentials['SecretAccessKey'] }}"
+    security_token: "{{ instance_security_credentials['Token'] }}"
+  no_log: yes
+
+- name: assume destination role
+  sts_assume_role:
+    role_arn: "{{ aws_profile_account_role_arn }}"
+    role_session_name: "{{ aws_profile_account_role_session_name }}"
+    region: "{{ aws_profile_account_region }}"
+    aws_access_key: "{{ aws_access_key }}"
+    aws_secret_key: "{{ aws_secret_key }}"
+    security_token: "{{ security_token }}"
+  register: aws_profile_account_sts_credentials
+  no_log: yes
